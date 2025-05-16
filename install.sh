@@ -62,13 +62,31 @@ install_python() {
     sudo apt install -y software-properties-common
     sudo add-apt-repository -y ppa:deadsnakes/ppa
     sudo apt update
-    sudo apt install -y python${PYTHON_VERSION} python3-pip
-  elif [[ "$OS" == "Darwin" ]]; then
-    brew install python@${PYTHON_VERSION}
-    brew link --overwrite python@${PYTHON_VERSION}
-  fi
+    sudo apt install -y python3.13 python3.13-venv python3.13-distutils python3.13-dev python3-pip
 
-  python3 -m pip install --upgrade pip virtualenv
+    # Symlink python3.13 binary to /usr/local/bin if not exists
+    if [[ ! -f /usr/local/bin/python3.13 ]]; then
+      sudo ln -s "$(which python3.13)" /usr/local/bin/python3.13
+    fi
+
+    # Install pip for python3.13 specifically
+    curl -sS https://bootstrap.pypa.io/get-pip.py | sudo python3.13
+
+    # Use pip3.13 to install virtualenv
+    sudo python3.13 -m pip install --upgrade pip virtualenv
+
+    # Optionally create a default virtualenv in ~/.venvs/default
+    mkdir -p ~/.venvs
+    python3.13 -m virtualenv ~/.venvs/default
+
+  elif [[ "$OS" == "Darwin" ]]; then
+    brew install python@3.13
+    # Create alias or symlink for python3.13 (Homebrew usually links automatically)
+    # Install virtualenv globally
+    python3.13 -m pip install --upgrade pip virtualenv
+    mkdir -p ~/.venvs
+    python3.13 -m virtualenv ~/.venvs/default
+  fi
 }
 
 # Install Go using GVM
