@@ -71,23 +71,27 @@ install_pyenv() {
       eval "$(pyenv init -)"
     fi
   else
-    echo "pyenv is already installed."
+    echo "pyenv already installed."
+    export PATH="$HOME/.pyenv/bin:$PATH"
+    eval "$(pyenv init --path)"
+    eval "$(pyenv init -)"
   fi
 
-  if ! pyenv versions --bare | grep -q "^${PYTHON_VERSION}$"; then
+  # Check if any installed python version starts with 3.13
+  if ! pyenv versions --bare | grep -q "^3\.13"; then
     echo "Installing Python ${PYTHON_VERSION} via pyenv..."
     pyenv install ${PYTHON_VERSION}
   else
-    echo "Python ${PYTHON_VERSION} is already installed."
+    echo "Python 3.13.x already installed."
   fi
 
   pyenv global ${PYTHON_VERSION}
   pyenv rehash
 
-  echo "Upgrading pip and installing virtualenv..."
-  pip install --upgrade pip virtualenv
+  # Use python -m pip instead of just pip to avoid 'command not found'
+  python -m ensurepip --upgrade || true
+  python -m pip install --upgrade pip virtualenv
 }
-
 
 install_go() {
   if [[ "$OS" == "Linux" ]]; then
