@@ -16,7 +16,6 @@ install_fonts() {
       /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
     echo "Installing Hack Nerd Font with Homebrew..."
-    brew tap homebrew/cask-fonts
     brew install --cask font-hack-nerd-font
   else
     echo "Installing Hack Nerd Font from source..."
