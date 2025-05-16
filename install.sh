@@ -7,7 +7,6 @@ GO_VERSION=go1.24.3
 
 OS=$(uname)
 ARCH=$(uname -m)
-SKIP_ZSH_BACKUP=${SKIP_ZSH_BACKUP:-false}
 
 # Font installation
 install_fonts() {
@@ -17,8 +16,7 @@ install_fonts() {
       /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
     echo "Installing Hack Nerd Font with Homebrew..."
-    brew tap homebrew/cask-fonts || true
-    brew install --cask font-hack-nerd-font || echo "Font already installed or cask not available"
+    brew install font-hack-nerd-font || echo "Font already installed or not available"
   else
     echo "Installing Hack Nerd Font from source..."
     git clone --depth 1 https://github.com/ryanoasis/nerd-fonts.git ~/.nerd-fonts
@@ -35,31 +33,23 @@ setup_zsh() {
     brew install zsh git curl wget unzip
   fi
 
-  if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
-    export RUNZSH=no
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-  else
-    echo "Oh My Zsh already installed, skipping installation."
-  fi
+  export RUNZSH=no
+  export ZSH="$HOME/.oh-my-zsh"
+  rm -rf "$ZSH"
+  sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
   git clone --depth=1 https://github.com/romkatv/powerlevel10k.git \
-    "$HOME/.oh-my-zsh/custom/themes/powerlevel10k" || \
-    git -C "$HOME/.oh-my-zsh/custom/themes/powerlevel10k" pull
+    "$ZSH/custom/themes/powerlevel10k" || \
+    git -C "$ZSH/custom/themes/powerlevel10k" pull
 
   for plugin in zsh-autosuggestions zsh-syntax-highlighting zsh-completions; do
-    plugin_path="$HOME/.oh-my-zsh/custom/plugins/$plugin"
+    plugin_path="$ZSH/custom/plugins/$plugin"
     if [[ -d "$plugin_path" ]]; then
       git -C "$plugin_path" pull
     else
       git clone https://github.com/zsh-users/$plugin "$plugin_path"
     fi
   done
-
-  if [[ "$SKIP_ZSH_BACKUP" != "true" ]]; then
-    echo "Backing up existing .zshrc and .p10k.zsh if present..."
-    [[ -f ~/.zshrc ]] && mv ~/.zshrc ~/.zshrc.backup.$(date +%s)
-    [[ -f ~/.p10k.zsh ]] && mv ~/.p10k.zsh ~/.p10k.zsh.backup.$(date +%s)
-  fi
 
   cp .zshrc ~/.zshrc
   cp .p10k.zsh ~/.p10k.zsh
