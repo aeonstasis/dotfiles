@@ -57,36 +57,31 @@ setup_zsh() {
 
 # Install Python and virtualenv
 install_python() {
-  if [[ "$OS" == "Linux" ]]; then
-    sudo apt update
-    sudo apt install -y software-properties-common
-    sudo add-apt-repository -y ppa:deadsnakes/ppa
-    sudo apt update
-    sudo apt install -y python3.13 python3.13-venv python3.13-distutils python3.13-dev python3-pip
-
-    # Symlink python3.13 binary to /usr/local/bin if not exists
-    if [[ ! -f /usr/local/bin/python3.13 ]]; then
-      sudo ln -s "$(which python3.13)" /usr/local/bin/python3.13
+  if ! command -v pyenv &>/dev/null; then
+    echo "Installing pyenv..."
+    if [[ "$OS" == "Darwin" ]]; then
+      brew update
+      brew install pyenv
+    else
+      curl https://pyenv.run | bash
+      # Add pyenv to shell config
+      export PATH="$HOME/.pyenv/bin:$PATH"
+      eval "$(pyenv init --path)"
+      eval "$(pyenv init -)"
+      eval "$(pyenv virtualenv-init -)"
     fi
-
-    # Install pip for python3.13 specifically
-    curl -sS https://bootstrap.pypa.io/get-pip.py | sudo python3.13
-
-    # Use pip3.13 to install virtualenv
-    sudo python3.13 -m pip install --upgrade pip virtualenv
-
-    # Optionally create a default virtualenv in ~/.venvs/default
-    mkdir -p ~/.venvs
-    python3.13 -m virtualenv ~/.venvs/default
-
-  elif [[ "$OS" == "Darwin" ]]; then
-    brew install python@3.13
-    # Create alias or symlink for python3.13 (Homebrew usually links automatically)
-    # Install virtualenv globally
-    python3.13 -m pip install --upgrade pip virtualenv
-    mkdir -p ~/.venvs
-    python3.13 -m virtualenv ~/.venvs/default
   fi
+
+  export PATH="$HOME/.pyenv/bin:$PATH"
+  eval "$(pyenv init --path)"
+  eval "$(pyenv init -)"
+  eval "$(pyenv virtualenv-init -)"
+
+  echo "Installing Python $PYTHON_VERSION via pyenv..."
+  pyenv install -s $PYTHON_VERSION
+  pyenv global $PYTHON_VERSION
+
+  python3 -m pip install --upgrade pip virtualenv
 }
 
 # Install Go using GVM
