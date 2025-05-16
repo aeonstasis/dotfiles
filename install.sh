@@ -45,6 +45,10 @@ setup_zsh() {
   git clone https://github.com/zsh-users/zsh-syntax-highlighting ~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting
   git clone https://github.com/zsh-users/zsh-completions ~/.oh-my-zsh/custom/plugins/zsh-completions
 
+  echo "Backing up existing .zshrc and .p10k.zsh if present..."
+  [[ -f ~/.zshrc ]] && mv ~/.zshrc ~/.zshrc.backup.$(date +%s)
+  [[ -f ~/.p10k.zsh ]] && mv ~/.p10k.zsh ~/.p10k.zsh.backup.$(date +%s)
+
   cp .zshrc ~/.zshrc
   cp .p10k.zsh ~/.p10k.zsh
 }
