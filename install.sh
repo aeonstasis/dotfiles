@@ -60,31 +60,34 @@ setup_zsh() {
 }
 
 install_pyenv() {
-  # pyenv install for Python version management
   if ! command -v pyenv &>/dev/null; then
     echo "Installing pyenv..."
     if [[ "$OS" == "Darwin" ]]; then
       brew install pyenv
     else
       curl https://pyenv.run | bash
-      # Add pyenv to shell
       export PATH="$HOME/.pyenv/bin:$PATH"
       eval "$(pyenv init --path)"
       eval "$(pyenv init -)"
     fi
+  else
+    echo "pyenv is already installed."
   fi
 
-  # Install Python version if not installed
   if ! pyenv versions --bare | grep -q "^${PYTHON_VERSION}$"; then
+    echo "Installing Python ${PYTHON_VERSION} via pyenv..."
     pyenv install ${PYTHON_VERSION}
+  else
+    echo "Python ${PYTHON_VERSION} is already installed."
   fi
 
   pyenv global ${PYTHON_VERSION}
   pyenv rehash
 
-  # Upgrade pip and install virtualenv
+  echo "Upgrading pip and installing virtualenv..."
   pip install --upgrade pip virtualenv
 }
+
 
 install_go() {
   if [[ "$OS" == "Linux" ]]; then
