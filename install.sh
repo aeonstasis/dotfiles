@@ -7,6 +7,7 @@ GO_VERSION=go1.24.3
 
 OS=$(uname)
 ARCH=$(uname -m)
+SKIP_ZSH_BACKUP=${SKIP_ZSH_BACKUP:-false}
 
 # Font installation
 install_fonts() {
@@ -16,7 +17,8 @@ install_fonts() {
       /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
     fi
     echo "Installing Hack Nerd Font with Homebrew..."
-    brew install --cask font-hack-nerd-font
+    brew tap homebrew/cask-fonts || true
+    brew install --cask font-hack-nerd-font || echo "Font already installed or cask not available"
   else
     echo "Installing Hack Nerd Font from source..."
     git clone --depth 1 https://github.com/ryanoasis/nerd-fonts.git ~/.nerd-fonts
@@ -33,21 +35,31 @@ setup_zsh() {
     brew install zsh git curl wget unzip
   fi
 
-  # Install Oh My Zsh
-  export RUNZSH=no
-  sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+  if [[ ! -d "$HOME/.oh-my-zsh" ]]; then
+    export RUNZSH=no
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+  else
+    echo "Oh My Zsh already installed, skipping installation."
+  fi
 
-  # Install Powerlevel10k
-  git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ~/.oh-my-zsh/custom/themes/powerlevel10k
+  git clone --depth=1 https://github.com/romkatv/powerlevel10k.git \
+    "$HOME/.oh-my-zsh/custom/themes/powerlevel10k" || \
+    git -C "$HOME/.oh-my-zsh/custom/themes/powerlevel10k" pull
 
-  # Plugins
-  git clone https://github.com/zsh-users/zsh-autosuggestions ~/.oh-my-zsh/custom/plugins/zsh-autosuggestions
-  git clone https://github.com/zsh-users/zsh-syntax-highlighting ~/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting
-  git clone https://github.com/zsh-users/zsh-completions ~/.oh-my-zsh/custom/plugins/zsh-completions
+  for plugin in zsh-autosuggestions zsh-syntax-highlighting zsh-completions; do
+    plugin_path="$HOME/.oh-my-zsh/custom/plugins/$plugin"
+    if [[ -d "$plugin_path" ]]; then
+      git -C "$plugin_path" pull
+    else
+      git clone https://github.com/zsh-users/$plugin "$plugin_path"
+    fi
+  done
 
-  echo "Backing up existing .zshrc and .p10k.zsh if present..."
-  [[ -f ~/.zshrc ]] && mv ~/.zshrc ~/.zshrc.backup.$(date +%s)
-  [[ -f ~/.p10k.zsh ]] && mv ~/.p10k.zsh ~/.p10k.zsh.backup.$(date +%s)
+  if [[ "$SKIP_ZSH_BACKUP" != "true" ]]; then
+    echo "Backing up existing .zshrc and .p10k.zsh if present..."
+    [[ -f ~/.zshrc ]] && mv ~/.zshrc ~/.zshrc.backup.$(date +%s)
+    [[ -f ~/.p10k.zsh ]] && mv ~/.p10k.zsh ~/.p10k.zsh.backup.$(date +%s)
+  fi
 
   cp .zshrc ~/.zshrc
   cp .p10k.zsh ~/.p10k.zsh
@@ -126,7 +138,7 @@ main() {
   install_utilities
   setup_docker_macos
 
-  echo "\n✔️ Dotfiles and environment setup complete. Restart your terminal."
+  echo -e "\n✔️ Dotfiles and environment setup complete. Restart your terminal."
 }
 
 main
