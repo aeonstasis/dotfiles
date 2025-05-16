@@ -78,34 +78,54 @@ setup_zsh() {
 }
 
 install_python() {
-  if [[ "$OS" == "Linux" ]]; then
-    sudo apt update
-    sudo apt install -y software-properties-common || true
-    if ! python3 --version 2>&1 | grep -q "Python ${PYTHON_VERSION}"; then
-      sudo add-apt-repository -y ppa:deadsnakes/ppa || true
+  # Check if pyenv installed
+  if ! command -v pyenv &>/dev/null; then
+    echo "Installing pyenv..."
+    if [[ "$OS" == "Darwin" ]]; then
+      brew update
+      brew install pyenv
+    else
+      # Linux installation dependencies
       sudo apt update
-      sudo apt install -y python${PYTHON_VERSION} python3-pip || true
-    else
-      echo "Python ${PYTHON_VERSION} already installed."
+      sudo apt install -y make build-essential libssl-dev zlib1g-dev \
+        libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm \
+        libncurses5-dev libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev \
+        python3-openssl git
+      curl https://pyenv.run | bash
     fi
-  elif [[ "$OS" == "Darwin" ]]; then
-    if brew list python@${PYTHON_VERSION} &>/dev/null; then
-      echo "Python@${PYTHON_VERSION} already installed."
-    else
-      brew install python@${PYTHON_VERSION}
-    fi
-    brew link --overwrite python@${PYTHON_VERSION} || true
+  else
+    echo "pyenv already installed."
   fi
 
-  # Make sure pip is available and upgrade
-  if ! command -v pip3 &>/dev/null; then
-    echo "pip3 not found, attempting to install..."
-    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-    python3 get-pip.py
-    rm get-pip.py
+  # Setup pyenv environment for current shell
+  export PYENV_ROOT="$HOME/.pyenv"
+  export PATH="$PYENV_ROOT/bin:$PATH"
+  if command -v pyenv &>/dev/null; then
+    eval "$(pyenv init -)"
   fi
 
-  python3 -m pip install --upgrade pip virtualenv
+  # Install Python if not already installed
+  if ! pyenv versions --bare | grep -q "^${PYTHON_VERSION}\$"; then
+    echo "Installing Python $PYTHON_VERSION via pyenv..."
+    pyenv install "$PYTHON_VERSION"
+  else
+    echo "Python $PYTHON_VERSION already installed via pyenv."
+  fi
+
+  pyenv global "$PYTHON_VERSION"
+
+  # Symlink python3-latest to pyenv python executable for convenience
+  ln -sf "$(pyenv which python3)" "$HOME/.local/bin/python3-latest" || true
+
+  # Ensure ~/.local/bin is in PATH
+  if ! echo "$PATH" | grep -q "$HOME/.local/bin"; then
+    export PATH="$HOME/.local/bin:$PATH"
+  fi
+
+  echo "Upgrading pip and installing virtualenv..."
+  python3-latest -m pip install --upgrade pip virtualenv
+
+  echo "Python $PYTHON_VERSION setup complete via pyenv."
 }
 
 install_go() {
