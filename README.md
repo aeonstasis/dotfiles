@@ -9,9 +9,8 @@ This repository contains dotfiles and an install script to bootstrap a modern, u
 
   * Python 3.13 with virtualenv
   * Go 1.24.3 managed by GVM (Go Version Manager)
-  * Kubernetes tooling: kind, kubectl, helm
+  * Kubernetes tooling: kubectl, helm
   * Utilities: jq, fzf, ripgrep, direnv
-* Docker backend setup on macOS (Docker Desktop preferred, falls back to Colima)
 * Configured `.zshrc` for a consistent shell experience
 
 ## Getting Started
@@ -51,15 +50,13 @@ This repository contains dotfiles and an install script to bootstrap a modern, u
 * Adds recommended Zsh plugins
 * Installs Python 3.13 (latest stable bleeding edge) and sets up virtualenv via pip
 * Installs Go 1.24.3 via [gvm](https://github.com/moovweb/gvm)
-* Installs Kubernetes tools: kind, kubectl, helm
+* Installs Kubernetes tools: kubectl, helm
 * Installs utilities like jq, fzf, ripgrep, direnv
-* On macOS, checks for Docker Desktop; if missing, installs and starts Colima for container backend
 
 ### Notes
 
 * **Python version:** The script installs Python 3.13 if available. On some Linux distros or older macOS Homebrew versions, this may not be present yet. Adjust the `PYTHON_VERSION` variable in the script as needed.
 * **Go version:** The script uses `go1.24.3` for gvm. Adjust with `GO_VERSION` variable.
-* **Docker backend on macOS:** Docker Desktop is preferred. If Docker Desktop is not running or installed, the script installs Colima to provide a lightweight Docker-compatible environment for Kubernetes kind.
 * **Windows WSL:** This script assumes Ubuntu on WSL2. Adjust package manager or tools if using different distros.
 * **Fonts:** After installation, you may need to configure your terminal emulator (Windows Terminal, iTerm2, etc.) to use the MesloLGS Nerd Font for best Powerlevel10k experience.
 

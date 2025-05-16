@@ -2,29 +2,33 @@
 
 set -euo pipefail
 
-PYTHON_VERSION=3.13
+PYTHON_VERSION=3.13.0
 GO_VERSION=go1.24.3
 
 OS=$(uname)
 ARCH=$(uname -m)
 
-# Font installation
 install_fonts() {
   if [[ "$OS" == "Darwin" ]]; then
     if ! command -v brew &>/dev/null; then
       echo "Installing Homebrew..."
       /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+      eval "$(/opt/homebrew/bin/brew shellenv)" # for Apple Silicon
     fi
     echo "Installing Hack Nerd Font with Homebrew..."
-    brew install font-hack-nerd-font || echo "Font already installed or not available"
+    brew tap homebrew/cask-fonts || true
+    brew install --cask font-hack-nerd-font || echo "Font already installed or not available"
   else
     echo "Installing Hack Nerd Font from source..."
-    git clone --depth 1 https://github.com/ryanoasis/nerd-fonts.git ~/.nerd-fonts
-    ~/.nerd-fonts/install.sh Hack
+    if [[ ! -d ~/.nerd-fonts ]]; then
+      git clone --depth 1 https://github.com/ryanoasis/nerd-fonts.git ~/.nerd-fonts
+      ~/.nerd-fonts/install.sh Hack
+    else
+      echo "Nerd Fonts repo already cloned."
+    fi
   fi
 }
 
-# Install Zsh, Oh My Zsh, Powerlevel10k and plugins
 setup_zsh() {
   if [[ "$OS" == "Linux" ]]; then
     sudo apt update
@@ -55,36 +59,33 @@ setup_zsh() {
   cp .p10k.zsh ~/.p10k.zsh
 }
 
-# Install Python and virtualenv
-install_python() {
+install_pyenv() {
+  # pyenv install for Python version management
   if ! command -v pyenv &>/dev/null; then
     echo "Installing pyenv..."
     if [[ "$OS" == "Darwin" ]]; then
-      brew update
       brew install pyenv
     else
       curl https://pyenv.run | bash
-      # Add pyenv to shell config
+      # Add pyenv to shell
       export PATH="$HOME/.pyenv/bin:$PATH"
       eval "$(pyenv init --path)"
       eval "$(pyenv init -)"
-      eval "$(pyenv virtualenv-init -)"
     fi
   fi
 
-  export PATH="$HOME/.pyenv/bin:$PATH"
-  eval "$(pyenv init --path)"
-  eval "$(pyenv init -)"
-  eval "$(pyenv virtualenv-init -)"
+  # Install Python version if not installed
+  if ! pyenv versions --bare | grep -q "^${PYTHON_VERSION}$"; then
+    pyenv install ${PYTHON_VERSION}
+  fi
 
-  echo "Installing Python $PYTHON_VERSION via pyenv..."
-  pyenv install -s $PYTHON_VERSION
-  pyenv global $PYTHON_VERSION
+  pyenv global ${PYTHON_VERSION}
+  pyenv rehash
 
-  python3 -m pip install --upgrade pip virtualenv
+  # Upgrade pip and install virtualenv
+  pip install --upgrade pip virtualenv
 }
 
-# Install Go using GVM
 install_go() {
   if [[ "$OS" == "Linux" ]]; then
     sudo apt install -y bison curl git make
@@ -92,27 +93,21 @@ install_go() {
     brew install bison curl git make
   fi
 
+  # Install gvm
   bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
+
+  # Define missing env vars to avoid unbound variable errors with set -u
+  export ZSH_VERSION=${ZSH_VERSION:-}
+  export GVM_DEBUG=${GVM_DEBUG:-0}
+
   [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
 
-  gvm install ${GO_VERSION}
+  if ! gvm list | grep -q "$GO_VERSION"; then
+    gvm install ${GO_VERSION}
+  fi
   gvm use ${GO_VERSION} --default
 }
 
-# Install Kubernetes tools
-install_kubernetes_tools() {
-  if [[ "$OS" == "Linux" ]]; then
-    sudo apt install -y kubectl helm
-  elif [[ "$OS" == "Darwin" ]]; then
-    brew install kubectl helm
-  fi
-
-  curl -Lo ./kind "https://kind.sigs.k8s.io/dl/v0.22.0/kind-${OS,,}-${ARCH}"
-  chmod +x ./kind
-  sudo mv ./kind /usr/local/bin/kind
-}
-
-# Install utilities
 install_utilities() {
   if [[ "$OS" == "Linux" ]]; then
     sudo apt install -y jq fzf ripgrep direnv
@@ -121,27 +116,14 @@ install_utilities() {
   fi
 }
 
-# Docker setup on macOS
-setup_docker_macos() {
-  if [[ "$OS" == "Darwin" ]]; then
-    if ! docker info &>/dev/null; then
-      echo "Docker Desktop not detected, installing Colima..."
-      brew install colima
-      colima start
-    fi
-  fi
-}
-
 main() {
   install_fonts
   setup_zsh
-  install_python
+  install_pyenv
   install_go
-  install_kubernetes_tools
   install_utilities
-  setup_docker_macos
 
-  echo -e "\n✔️ Dotfiles and environment setup complete. Restart your terminal."
+  echo -e "\n✔️ Dotfiles and environment setup complete. Restart your terminal or run 'exec zsh'."
 }
 
 main
