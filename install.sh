@@ -129,32 +129,18 @@ install_python() {
 }
 
 install_go() {
-  if ! command -v gvm &>/dev/null; then
-    echo "Installing gvm..."
-    bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
+  if [[ "$OS" == "Darwin" ]]; then
+    brew install go
   else
-    echo "gvm already installed."
-  fi
-
-  if [[ -s "$HOME/.gvm/scripts/gvm" ]]; then
-    # shellcheck source=/dev/null
-    source "$HOME/.gvm/scripts/gvm"
-  else
-    echo "gvm script not found, skipping Go install."
-    return 1
-  fi
-
-  (
-    set -e
-    if ! gvm list | grep -q "${GO_VERSION}"; then
-      echo "Installing Go ${GO_VERSION}..."
-      gvm install "${GO_VERSION}"
-    else
-      echo "Go ${GO_VERSION} already installed."
+    # Linux: Download official Go tarball if not installed or install from package manager
+    if ! command -v go &>/dev/null; then
+      GO_TARBALL="go${GO_VERSION}.linux-amd64.tar.gz"
+      wget "https://go.dev/dl/${GO_TARBALL}"
+      sudo rm -rf /usr/local/go
+      sudo tar -C /usr/local -xzf "${GO_TARBALL}"
+      rm "${GO_TARBALL}"
     fi
-
-    gvm use "${GO_VERSION}" --default
-  )
+  fi
 }
 
 install_kubernetes_tools() {
