@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-PYTHON_VERSION=3.13.0
+PYTHON_VERSION=3.13
 GO_VERSION=go1.24.3
 
 OS=$(uname)
@@ -13,19 +13,22 @@ install_fonts() {
     if ! command -v brew &>/dev/null; then
       echo "Installing Homebrew..."
       /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-      eval "$(/opt/homebrew/bin/brew shellenv)" # for Apple Silicon
     fi
-    echo "Installing Hack Nerd Font with Homebrew..."
-    brew tap homebrew/cask-fonts || true
-    brew install --cask font-hack-nerd-font || echo "Font already installed or not available"
-  else
-    echo "Installing Hack Nerd Font from source..."
-    if [[ ! -d ~/.nerd-fonts ]]; then
-      git clone --depth 1 https://github.com/ryanoasis/nerd-fonts.git ~/.nerd-fonts
-      ~/.nerd-fonts/install.sh Hack
+    if brew list --cask font-hack-nerd-font &>/dev/null; then
+      echo "Hack Nerd Font already installed."
     else
-      echo "Nerd Fonts repo already cloned."
+      echo "Installing Hack Nerd Font with Homebrew..."
+      brew install --cask font-hack-nerd-font
     fi
+  else
+    if [[ -d "$HOME/.nerd-fonts" ]]; then
+      echo "Nerd Fonts repo already cloned."
+    else
+      echo "Cloning Nerd Fonts repo..."
+      git clone --depth 1 https://github.com/ryanoasis/nerd-fonts.git ~/.nerd-fonts
+    fi
+    echo "Installing Hack Nerd Font..."
+    ~/.nerd-fonts/install.sh Hack
   fi
 }
 
@@ -34,103 +37,132 @@ setup_zsh() {
     sudo apt update
     sudo apt install -y zsh git curl wget unzip
   elif [[ "$OS" == "Darwin" ]]; then
-    brew install zsh git curl wget unzip
+    brew install zsh git curl wget unzip || true
   fi
 
   export RUNZSH=no
   export ZSH="$HOME/.oh-my-zsh"
-  rm -rf "$ZSH"
+
+  if [[ -d "$ZSH" ]]; then
+    echo "Removing existing Oh My Zsh at $ZSH"
+    rm -rf "$ZSH"
+  fi
+
+  echo "Installing Oh My Zsh..."
   sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
-  git clone --depth=1 https://github.com/romkatv/powerlevel10k.git \
-    "$ZSH/custom/themes/powerlevel10k" || \
+  # Powerlevel10k theme
+  if [[ -d "$ZSH/custom/themes/powerlevel10k" ]]; then
+    echo "Updating powerlevel10k theme..."
     git -C "$ZSH/custom/themes/powerlevel10k" pull
+  else
+    echo "Installing powerlevel10k theme..."
+    git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "$ZSH/custom/themes/powerlevel10k"
+  fi
 
+  # Plugins
   for plugin in zsh-autosuggestions zsh-syntax-highlighting zsh-completions; do
     plugin_path="$ZSH/custom/plugins/$plugin"
     if [[ -d "$plugin_path" ]]; then
+      echo "Updating plugin $plugin..."
       git -C "$plugin_path" pull
     else
+      echo "Installing plugin $plugin..."
       git clone https://github.com/zsh-users/$plugin "$plugin_path"
     fi
   done
 
-  cp .zshrc ~/.zshrc
-  cp .p10k.zsh ~/.p10k.zsh
+  echo "Copying .zshrc and .p10k.zsh configuration files..."
+  cp -f .zshrc ~/.zshrc
+  cp -f .p10k.zsh ~/.p10k.zsh
 }
 
-install_pyenv() {
-  if ! command -v pyenv &>/dev/null; then
-    echo "Installing pyenv..."
-    if [[ "$OS" == "Darwin" ]]; then
-      brew install pyenv
+install_python() {
+  if [[ "$OS" == "Linux" ]]; then
+    sudo apt update
+    sudo apt install -y software-properties-common || true
+    if ! python3 --version 2>&1 | grep -q "Python ${PYTHON_VERSION}"; then
+      sudo add-apt-repository -y ppa:deadsnakes/ppa || true
+      sudo apt update
+      sudo apt install -y python${PYTHON_VERSION} python3-pip || true
     else
-      curl https://pyenv.run | bash
-      export PATH="$HOME/.pyenv/bin:$PATH"
-      eval "$(pyenv init --path)"
-      eval "$(pyenv init -)"
+      echo "Python ${PYTHON_VERSION} already installed."
     fi
-  else
-    echo "pyenv already installed."
-    export PATH="$HOME/.pyenv/bin:$PATH"
-    eval "$(pyenv init --path)"
-    eval "$(pyenv init -)"
+  elif [[ "$OS" == "Darwin" ]]; then
+    if brew list python@${PYTHON_VERSION} &>/dev/null; then
+      echo "Python@${PYTHON_VERSION} already installed."
+    else
+      brew install python@${PYTHON_VERSION}
+    fi
+    brew link --overwrite python@${PYTHON_VERSION} || true
   fi
 
-  # Check if any installed python version starts with 3.13
-  if ! pyenv versions --bare | grep -q "^3\.13"; then
-    echo "Installing Python ${PYTHON_VERSION} via pyenv..."
-    pyenv install ${PYTHON_VERSION}
-  else
-    echo "Python 3.13.x already installed."
+  # Make sure pip is available and upgrade
+  if ! command -v pip3 &>/dev/null; then
+    echo "pip3 not found, attempting to install..."
+    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+    python3 get-pip.py
+    rm get-pip.py
   fi
 
-  pyenv global ${PYTHON_VERSION}
-  pyenv rehash
-
-  # Use python -m pip instead of just pip to avoid 'command not found'
-  python -m ensurepip --upgrade || true
-  python -m pip install --upgrade pip virtualenv
+  python3 -m pip install --upgrade pip virtualenv
 }
 
 install_go() {
+  if ! command -v gvm &>/dev/null; then
+    echo "Installing gvm..."
+    bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
+  else
+    echo "gvm already installed."
+  fi
+
+  if [[ -s "$HOME/.gvm/scripts/gvm" ]]; then
+    # shellcheck source=/dev/null
+    source "$HOME/.gvm/scripts/gvm"
+  else
+    echo "gvm script not found, skipping Go install."
+    return 1
+  fi
+
+  (
+    set -e
+    if ! gvm list | grep -q "${GO_VERSION}"; then
+      echo "Installing Go ${GO_VERSION}..."
+      gvm install "${GO_VERSION}"
+    else
+      echo "Go ${GO_VERSION} already installed."
+    fi
+
+    gvm use "${GO_VERSION}" --default
+  )
+}
+
+install_kubernetes_tools() {
   if [[ "$OS" == "Linux" ]]; then
-    sudo apt install -y bison curl git make
+    sudo apt install -y kubectl helm || true
   elif [[ "$OS" == "Darwin" ]]; then
-    brew install bison curl git make
+    brew install kubectl helm || true
   fi
-
-  # Install gvm
-  bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
-
-  # Define missing env vars to avoid unbound variable errors with set -u
-  export ZSH_VERSION=${ZSH_VERSION:-}
-  export GVM_DEBUG=${GVM_DEBUG:-0}
-
-  [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
-
-  if ! gvm list | grep -q "$GO_VERSION"; then
-    gvm install ${GO_VERSION}
-  fi
-  gvm use ${GO_VERSION} --default
 }
 
 install_utilities() {
   if [[ "$OS" == "Linux" ]]; then
-    sudo apt install -y jq fzf ripgrep direnv
+    sudo apt install -y jq fzf ripgrep direnv || true
   elif [[ "$OS" == "Darwin" ]]; then
-    brew install jq fzf ripgrep direnv
+    brew install jq fzf ripgrep direnv || true
   fi
 }
 
 main() {
   install_fonts
   setup_zsh
-  install_pyenv
+  install_python
   install_go
+  install_kubernetes_tools
   install_utilities
 
-  echo -e "\n✔️ Dotfiles and environment setup complete. Restart your terminal or run 'exec zsh'."
+  echo -e "\n✔️ Dotfiles and environment setup complete."
+  echo "Please restart your terminal or run 'source ~/.zshrc' to activate all changes."
 }
 
 main
